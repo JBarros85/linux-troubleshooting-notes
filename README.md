@@ -9,6 +9,7 @@ The goal of this repository is to share practical fixes that may help other Linu
 ### Ubuntu / GNOME
 
 - [Firefox window partially hidden when using split screen on Ubuntu 26.04](ubuntu-26.04/firefox-tiling-assistant.md)
+- [Launch a Firefox website as a separate GNOME application on Ubuntu 26.04](ubuntu-26.04/firefox-separate-web-app-gnome-wayland.md)
 
 ## Environment
 
