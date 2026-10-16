@@ -2,118 +2,191 @@
 
 ## Problem
 
-When Firefox was snapped to half of the screen, part of the browser window remained outside the visible desktop area.
+On Ubuntu 26.04 with GNOME and Wayland, Firefox could become partially positioned outside the visible screen area when using window tiling.
 
-Repeatedly resizing, maximizing or snapping the window again did not solve the problem.
+The issue appeared while using Ubuntu's bundled **Tiling Assistant** extension.
+
+Instead of fitting correctly inside the selected region, part of the Firefox window could remain outside the visible desktop area.
 
 ## Environment
 
-The issue was observed with:
+Tested with:
 
 ```text
 Ubuntu 26.04.1 LTS
 GNOME Shell 50.1
 Wayland
-tiling-assistant@ubuntu.com
+Ubuntu Tiling Assistant 54
+Firefox DEB from Mozilla
 ```
-
-## Symptoms
-
-When using split-screen mode:
-
-- Firefox did not fit correctly inside half of the display
-- Part of the window remained hidden
-- Manual resizing did not permanently correct the position
-- Re-snapping the window produced the same behaviour
-
-Initially, the problem appeared to be related to Firefox itself.
 
 ## Diagnosis
 
-The desktop environment and active tiling extensions were checked with:
+The desktop session and extension were checked with:
 
 ```bash
 echo "$XDG_SESSION_TYPE"
 lsb_release -ds
 gnome-shell --version
 gnome-extensions list | grep -i tiling
+gnome-extensions info tiling-assistant@ubuntu.com
 ```
 
-The environment reported the Ubuntu Tiling Assistant extension:
+The environment showed:
 
 ```text
-tiling-assistant@ubuntu.com
+Wayland
+GNOME Shell 50.1
+Ubuntu Tiling Assistant 54
 ```
 
-To isolate the issue, the extension was disabled without changing any Firefox configuration.
+## Initial workaround
 
-## Solution
-
-Disable the Ubuntu Tiling Assistant extension:
+Disabling the Tiling Assistant immediately stopped the Firefox positioning problem:
 
 ```bash
 gnome-extensions disable tiling-assistant@ubuntu.com
 ```
 
-After disabling the extension, Firefox immediately started snapping correctly using GNOME's native window tiling.
+After disabling the extension, Firefox could again be tiled using GNOME's native window management without being partially hidden.
 
-No Firefox configuration changes were required.
+However, this was only a **workaround**, not a complete solution.
 
-## Re-enable Tiling Assistant
+## Important side effect
 
-If needed, the extension can be enabled again with:
+Ubuntu's Tiling Assistant provides functionality beyond GNOME's basic two-column tiling.
+
+When the extension was disabled, quarter-screen tiling was lost.
+
+Instead of being able to arrange four windows in:
+
+```text
++-----------+-----------+
+|           |           |
+|     1     |     2     |
+|           |           |
++-----------+-----------+
+|           |           |
+|     3     |     4     |
+|           |           |
++-----------+-----------+
+```
+
+the desktop was limited mainly to left/right half-screen tiling.
+
+Therefore, permanently disabling Tiling Assistant is not an ideal fix for users who rely on quarter-screen layouts.
+
+## Re-enabling quarter tiling
+
+The extension can be enabled again with:
 
 ```bash
 gnome-extensions enable tiling-assistant@ubuntu.com
 ```
 
-## Result
+Its status can be checked with:
 
-In this specific environment, disabling only:
+```bash
+gnome-extensions info tiling-assistant@ubuntu.com
+```
+
+In the tested configuration, the quarter-screen shortcuts were still configured as:
+
+```text
+Super + Num7  -> top-left
+Super + Num9  -> top-right
+Super + Num1  -> bottom-left
+Super + Num3  -> bottom-right
+```
+
+They can be inspected with:
+
+```bash
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-topleft-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-topright-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomleft-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomright-quarter
+```
+
+## About GNOME `edge-tiling`
+
+While Tiling Assistant is active, this command may report:
+
+```bash
+gsettings get org.gnome.mutter edge-tiling
+```
+
+```text
+false
+```
+
+This does not necessarily mean tiling is disabled.
+
+Tiling Assistant can override GNOME/Mutter's native tiling settings while the extension is active.
+
+The original values can be inspected with:
+
+```bash
+gsettings get org.gnome.shell.extensions.tiling-assistant overridden-settings
+```
+
+For example:
+
+```text
+{'org.gnome.mutter.edge-tiling': <true>, ...}
+```
+
+This means the extension has stored the previous Mutter setting while providing its own tiling behaviour.
+
+## Current conclusion
+
+Disabling:
 
 ```text
 tiling-assistant@ubuntu.com
 ```
 
-resolved the split-screen positioning problem.
+is a useful diagnostic step and can work around Firefox positioning issues.
 
-The issue therefore appeared to be related to the interaction between the Tiling Assistant extension and window placement rather than Firefox itself.
+However, it should not be presented as a universal or permanent fix because it also removes functionality provided by the extension, including quarter-screen tiling.
 
-## Troubleshooting Principle
+A better troubleshooting approach is:
 
-When an application window behaves incorrectly under GNOME, it can be useful to isolate desktop extensions before modifying the application.
+1. Confirm whether Tiling Assistant is involved.
+2. Temporarily disable it and test Firefox.
+3. If the problem disappears, the extension is part of the interaction.
+4. Re-enable it if quarter-screen tiling is required.
+5. Test the specific Firefox and tiling behaviour again after re-enabling.
+6. Avoid treating extension removal as a complete fix unless losing its additional tiling features is acceptable.
 
-A simple diagnostic approach is:
+## Commands used during troubleshooting
 
-```text
-Application problem suspected
-        |
-        v
-Check desktop session
-        |
-        v
-Check GNOME extensions
-        |
-        v
-Disable suspected extension
-        |
-        v
-Retest application
-        |
-        v
-Identify affected layer
+```bash
+echo "$XDG_SESSION_TYPE"
+lsb_release -ds
+gnome-shell --version
+
+gnome-extensions info tiling-assistant@ubuntu.com
+
+gsettings get org.gnome.shell.extensions.tiling-assistant default-move-mode
+
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-topleft-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-topright-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomleft-quarter
+gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomright-quarter
+
+gsettings get org.gnome.mutter edge-tiling
+
+gsettings get org.gnome.shell.extensions.tiling-assistant overridden-settings
 ```
 
-This avoids unnecessary application changes when the actual problem is in the desktop environment.
+## Lesson learned
 
-## Notes
+A workaround that removes the visible symptom can also remove useful desktop functionality.
 
-This solution was confirmed on:
+When documenting troubleshooting, it is important to record both:
 
-- Ubuntu 26.04.1 LTS
-- GNOME Shell 50.1
-- Wayland
-- Firefox
-- Ubuntu Tiling Assistant
+- what solved or isolated the original symptom;
+- what functionality was lost as a consequence.
 
-Behaviour may differ on other GNOME, Ubuntu or Firefox versions.
+This case is therefore documented as an interaction between Firefox, GNOME/Wayland and Ubuntu Tiling Assistant rather than as a confirmed universal Firefox bug.
