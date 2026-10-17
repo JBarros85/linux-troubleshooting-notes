@@ -4,61 +4,64 @@
 
 On Ubuntu 26.04 with GNOME and Wayland, Firefox could become partially positioned outside the visible screen area when using window tiling.
 
-The issue appeared while using Ubuntu's bundled **Tiling Assistant** extension.
+The issue was initially observed while Ubuntu's bundled Tiling Assistant extension was active.
 
 Instead of fitting correctly inside the selected region, part of the Firefox window could remain outside the visible desktop area.
 
 ## Environment
 
-Tested with:
+The original issue was observed with:
 
 ```text
 Ubuntu 26.04.1 LTS
 GNOME Shell 50.1
 Wayland
-Ubuntu Tiling Assistant 54
 Firefox DEB from Mozilla
+Ubuntu Tiling Assistant 54
 ```
 
-## Diagnosis
+The system extension was:
 
-The desktop session and extension were checked with:
+```text
+tiling-assistant@ubuntu.com
+```
+
+## Initial diagnosis
+
+The desktop environment and tiling extension were inspected with:
 
 ```bash
 echo "$XDG_SESSION_TYPE"
 lsb_release -ds
 gnome-shell --version
-gnome-extensions list | grep -i tiling
 gnome-extensions info tiling-assistant@ubuntu.com
 ```
 
-The environment showed:
+The Ubuntu-provided extension reported:
 
 ```text
-Wayland
-GNOME Shell 50.1
-Ubuntu Tiling Assistant 54
+Version: 54
 ```
 
-## Initial workaround
-
-Disabling the Tiling Assistant immediately stopped the Firefox positioning problem:
+As a diagnostic test, it was disabled:
 
 ```bash
 gnome-extensions disable tiling-assistant@ubuntu.com
 ```
 
-After disabling the extension, Firefox could again be tiled using GNOME's native window management without being partially hidden.
+After disabling it, the Firefox positioning problem stopped occurring.
 
-However, this was only a **workaround**, not a complete solution.
+This showed that the tiling extension was involved in the behaviour observed in this environment.
 
-## Important side effect
+## Side effect of disabling the extension
 
-Ubuntu's Tiling Assistant provides functionality beyond GNOME's basic two-column tiling.
+Disabling Ubuntu Tiling Assistant also removed its quarter-screen tiling functionality.
 
-When the extension was disabled, quarter-screen tiling was lost.
+GNOME's remaining tiling behaviour was mainly limited to left/right half-screen layouts.
 
-Instead of being able to arrange four windows in:
+This meant that permanently disabling the extension was not an ideal solution because four-window layouts were still required.
+
+Example quarter-screen layout:
 
 ```text
 +-----------+-----------+
@@ -72,34 +75,78 @@ Instead of being able to arrange four windows in:
 +-----------+-----------+
 ```
 
-the desktop was limited mainly to left/right half-screen tiling.
+## Follow-up investigation
 
-Therefore, permanently disabling Tiling Assistant is not an ideal fix for users who rely on quarter-screen layouts.
+A later audit showed that two different Tiling Assistant installations existed on the system.
 
-## Re-enabling quarter tiling
-
-The extension can be enabled again with:
-
-```bash
-gnome-extensions enable tiling-assistant@ubuntu.com
-```
-
-Its status can be checked with:
-
-```bash
-gnome-extensions info tiling-assistant@ubuntu.com
-```
-
-In the tested configuration, the quarter-screen shortcuts were still configured as:
+### Ubuntu-packaged extension
 
 ```text
-Super + Num7  -> top-left
-Super + Num9  -> top-right
-Super + Num1  -> bottom-left
-Super + Num3  -> bottom-right
+UUID: tiling-assistant@ubuntu.com
+Path: /usr/share/gnome-shell/extensions/tiling-assistant@ubuntu.com
+Version: 54
+Enabled: No
+State: INITIALIZED
 ```
 
-They can be inspected with:
+### Active user extension
+
+```text
+UUID: tiling-assistant@leleat-on-github
+Path: ~/.local/share/gnome-shell/extensions/tiling-assistant@leleat-on-github
+Version: 56
+Enabled: Yes
+State: ACTIVE
+```
+
+The metadata of the active extension identifies the project as:
+
+```text
+https://github.com/ubuntu/Tiling-Assistant
+```
+
+and declares support for GNOME Shell:
+
+```text
+48
+49
+50
+51
+```
+
+## Current working configuration
+
+The current tested configuration is therefore:
+
+```text
+Ubuntu 26.04.1 LTS
+GNOME Shell 50.1
+Wayland
+Firefox DEB from Mozilla
+
+tiling-assistant@ubuntu.com
+Version: 54
+Status: disabled
+
+tiling-assistant@leleat-on-github
+Version: 56
+Status: active
+```
+
+With Tiling Assistant 56 active:
+
+- Half-screen tiling works
+- Quarter-screen tiling works
+- Four-window layouts work again
+- Firefox can be tiled normally
+- The previous window-positioning behaviour has not reappeared during subsequent normal use
+- No further desktop freezes related to this workflow have been observed during subsequent use
+
+These observations describe this specific system and should not be interpreted as proof that version 56 universally fixes every Firefox or GNOME tiling issue.
+
+## Quarter-screen shortcuts
+
+The configured quarter-screen shortcuts can be checked with:
 
 ```bash
 gsettings get org.gnome.shell.extensions.tiling-assistant tile-topleft-quarter
@@ -108,9 +155,51 @@ gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomleft-quarte
 gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomright-quarter
 ```
 
-## About GNOME `edge-tiling`
+In this environment they were:
 
-While Tiling Assistant is active, this command may report:
+```text
+Super + Num7  -> top-left
+Super + Num9  -> top-right
+Super + Num1  -> bottom-left
+Super + Num3  -> bottom-right
+```
+
+## How to identify which extension is actually active
+
+When troubleshooting multiple installations, checking only one known UUID can produce the wrong conclusion.
+
+List active extensions related to tiling:
+
+```bash
+gnome-extensions list --enabled | grep -Ei 'tiling|tile'
+```
+
+Inspect the Ubuntu version:
+
+```bash
+gnome-extensions info tiling-assistant@ubuntu.com
+```
+
+Inspect the user-installed version:
+
+```bash
+gnome-extensions info tiling-assistant@leleat-on-github
+```
+
+Find their installation locations:
+
+```bash
+find ~/.local/share/gnome-shell/extensions \
+     /usr/share/gnome-shell/extensions \
+     -maxdepth 1 \
+     -type d \
+     -iname '*tiling*' \
+     -print 2>/dev/null
+```
+
+## About GNOME edge tiling
+
+With Tiling Assistant controlling window placement, this setting may report:
 
 ```bash
 gsettings get org.gnome.mutter edge-tiling
@@ -120,73 +209,56 @@ gsettings get org.gnome.mutter edge-tiling
 false
 ```
 
-This does not necessarily mean tiling is disabled.
+This alone does not mean that window tiling is unavailable.
 
-Tiling Assistant can override GNOME/Mutter's native tiling settings while the extension is active.
+Tiling Assistant manages its own tiling behaviour and can override Mutter settings while active.
 
-The original values can be inspected with:
+Stored overridden values can be inspected with:
 
 ```bash
 gsettings get org.gnome.shell.extensions.tiling-assistant overridden-settings
 ```
 
-For example:
+## Final conclusion
 
-```text
-{'org.gnome.mutter.edge-tiling': <true>, ...}
-```
-
-This means the extension has stored the previous Mutter setting while providing its own tiling behaviour.
-
-## Current conclusion
-
-Disabling:
+The original advice to permanently disable:
 
 ```text
 tiling-assistant@ubuntu.com
 ```
 
-is a useful diagnostic step and can work around Firefox positioning issues.
+was incomplete.
 
-However, it should not be presented as a universal or permanent fix because it also removes functionality provided by the extension, including quarter-screen tiling.
+Disabling version 54 was useful as a **diagnostic workaround** because it isolated the original Firefox positioning problem, but it also removed quarter-screen tiling.
 
-A better troubleshooting approach is:
+The current working configuration uses:
 
-1. Confirm whether Tiling Assistant is involved.
-2. Temporarily disable it and test Firefox.
-3. If the problem disappears, the extension is part of the interaction.
-4. Re-enable it if quarter-screen tiling is required.
-5. Test the specific Firefox and tiling behaviour again after re-enabling.
-6. Avoid treating extension removal as a complete fix unless losing its additional tiling features is acceptable.
-
-## Commands used during troubleshooting
-
-```bash
-echo "$XDG_SESSION_TYPE"
-lsb_release -ds
-gnome-shell --version
-
-gnome-extensions info tiling-assistant@ubuntu.com
-
-gsettings get org.gnome.shell.extensions.tiling-assistant default-move-mode
-
-gsettings get org.gnome.shell.extensions.tiling-assistant tile-topleft-quarter
-gsettings get org.gnome.shell.extensions.tiling-assistant tile-topright-quarter
-gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomleft-quarter
-gsettings get org.gnome.shell.extensions.tiling-assistant tile-bottomright-quarter
-
-gsettings get org.gnome.mutter edge-tiling
-
-gsettings get org.gnome.shell.extensions.tiling-assistant overridden-settings
+```text
+tiling-assistant@leleat-on-github
+Version 56
 ```
+
+while Ubuntu's bundled:
+
+```text
+tiling-assistant@ubuntu.com
+Version 54
+```
+
+remains disabled.
+
+This restores four-quadrant tiling while, in subsequent testing on this machine, the original Firefox positioning issue and desktop freezes have not been observed again.
 
 ## Lesson learned
 
-A workaround that removes the visible symptom can also remove useful desktop functionality.
+When multiple versions of the same GNOME extension can exist simultaneously, troubleshooting should verify:
 
-When documenting troubleshooting, it is important to record both:
+- UUID
+- version
+- installation path
+- enabled state
+- active state
 
-- what solved or isolated the original symptom;
-- what functionality was lost as a consequence.
+The extension name alone is not enough to determine which implementation is actually controlling the desktop.
 
-This case is therefore documented as an interaction between Firefox, GNOME/Wayland and Ubuntu Tiling Assistant rather than as a confirmed universal Firefox bug.
+A workaround should also be documented together with its side effects rather than presented as a permanent fix before the final system state has been verified.
