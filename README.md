@@ -31,3 +31,9 @@ The cases documented here may involve technologies such as:
 These notes describe solutions confirmed in specific environments.
 
 A solution documented here should not automatically be assumed to apply to every Linux installation or software version.
+
+## Troubleshooting Method
+
+New cases are documented using a consistent structure covering the problem, environment, investigation, unsuccessful attempts, solution, verification and side effects.
+
+A reusable template is available in [TROUBLESHOOTING_TEMPLATE.md](TROUBLESHOOTING_TEMPLATE.md).
