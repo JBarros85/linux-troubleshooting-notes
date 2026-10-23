@@ -31,6 +31,7 @@ The cases documented here may involve technologies such as:
 These notes describe solutions confirmed in specific environments.
 
 A solution documented here should not automatically be assumed to apply to every Linux installation or software version.
+- [Logrotate failing because of a duplicate cloud-init configuration on Ubuntu 26.04](ubuntu-26.04/logrotate-cloud-init-duplicate-entry.md)
 
 ## Troubleshooting Method
 
